@@ -1,0 +1,729 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<meta name="theme-color" content="#EDEEEA">
+<title>Stoa — Quote Visor</title>
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" href="icon-192.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  :root{
+    --bg: #EDEEEA;
+    --card: #F7F7F3;
+    --ink: #22262B;
+    --ink-soft: #4A4E52;
+    --stone: #9A9A94;
+    --stone-line: #DAD9D2;
+    --moss: #5F7460;
+    --moss-soft: #EAEFE9;
+    --radius: 18px;
+  }
+  *{box-sizing:border-box; -webkit-tap-highlight-color: transparent;}
+  html,body{height:100%;}
+  body{
+    margin:0;
+    background:var(--bg);
+    color:var(--ink);
+    font-family:'Inter', sans-serif;
+    display:flex;
+    flex-direction:column;
+    min-height:100vh;
+    min-height:100dvh;
+    overflow-x:hidden;
+  }
+
+  /* subtle vertical breath-line texture, echoes the icon mark, no imagery */
+  body::before{
+    content:"";
+    position:fixed;
+    top:0; left:50%;
+    width:1px; height:100%;
+    background:var(--stone-line);
+    opacity:.5;
+    transform:translateX(-50%);
+    pointer-events:none;
+    z-index:0;
+  }
+
+  header{
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+    padding: max(18px, env(safe-area-inset-top)) 20px 12px;
+    position:relative;
+    z-index:20;
+  }
+  .brand{
+    font-family:'Fraunces', serif;
+    font-size:15px;
+    letter-spacing:0.14em;
+    text-transform:uppercase;
+    color:var(--ink-soft);
+    font-weight:500;
+  }
+
+  .menu-wrap{ position:relative; }
+  .menu-btn{
+    width:38px; height:38px;
+    border-radius:50%;
+    border:1px solid var(--stone-line);
+    background:var(--card);
+    display:flex; align-items:center; justify-content:center;
+    cursor:pointer;
+    color:var(--ink);
+    transition: background .2s ease, transform .2s ease;
+  }
+  .menu-btn:hover{ background:var(--moss-soft); }
+  .menu-btn:active{ transform:scale(.94); }
+  .menu-btn svg{ width:16px; height:16px; }
+
+  .dropdown{
+    position:absolute;
+    top:46px; right:0;
+    width:280px;
+    max-width:80vw;
+    background:var(--card);
+    border:1px solid var(--stone-line);
+    border-radius:14px;
+    box-shadow: 0 12px 28px rgba(34,38,43,0.12);
+    padding:6px;
+    opacity:0;
+    transform:translateY(-6px);
+    pointer-events:none;
+    transition: opacity .18s ease, transform .18s ease;
+    max-height:70vh;
+    overflow-y:auto;
+  }
+  .dropdown.open{ opacity:1; transform:translateY(0); pointer-events:auto; }
+
+  .dd-section{ padding:10px 12px 8px; }
+  .dd-label{
+    font-size:10.5px;
+    letter-spacing:.08em;
+    text-transform:uppercase;
+    color:var(--stone);
+    margin-bottom:8px;
+    font-weight:600;
+  }
+  .dd-divider{ height:1px; background:var(--stone-line); margin:2px 6px; }
+
+  .toggle-row{
+    display:flex; align-items:center; justify-content:space-between;
+    padding:7px 0;
+    font-size:14px;
+  }
+  .switch{
+    width:36px; height:21px;
+    border-radius:20px;
+    background:var(--stone-line);
+    position:relative;
+    cursor:pointer;
+    transition: background .2s ease;
+    flex-shrink:0;
+  }
+  .switch.on{ background:var(--moss); }
+  .switch::after{
+    content:"";
+    position:absolute;
+    width:15px; height:15px;
+    border-radius:50%;
+    background:#fff;
+    top:3px; left:3px;
+    transition: left .2s ease;
+  }
+  .switch.on::after{ left:18px; }
+
+  .dd-btn{
+    width:100%;
+    text-align:left;
+    background:none;
+    border:none;
+    font-family:'Inter', sans-serif;
+    font-size:14px;
+    color:var(--ink);
+    padding:9px 6px;
+    border-radius:8px;
+    cursor:pointer;
+    display:flex;
+    justify-content:space-between;
+    align-items:center;
+  }
+  .dd-btn:hover{ background:var(--moss-soft); }
+  .dd-btn .count{
+    font-family:'JetBrains Mono', monospace;
+    font-size:11px;
+    color:var(--stone);
+  }
+  .dd-btn.active{ color:var(--moss); font-weight:600; }
+
+  .tag-list{ display:flex; flex-wrap:wrap; gap:6px; padding:4px 6px 8px; }
+  .tag-chip{
+    font-family:'JetBrains Mono', monospace;
+    font-size:11px;
+    padding:5px 10px;
+    border-radius:20px;
+    border:1px solid var(--stone-line);
+    background:transparent;
+    color:var(--ink-soft);
+    cursor:pointer;
+    transition: all .15s ease;
+  }
+  .tag-chip.selected{
+    background:var(--moss);
+    border-color:var(--moss);
+    color:#fff;
+  }
+
+  main{
+    flex:1;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    padding: 10px 22px 20px;
+    position:relative;
+    z-index:5;
+  }
+
+  .stage{
+    width:100%;
+    max-width:620px;
+  }
+
+  .card{
+    background:var(--card);
+    border:1px solid var(--stone-line);
+    border-radius:var(--radius);
+    padding:44px 38px 34px;
+    text-align:center;
+    opacity:1;
+    transform:translateY(0);
+    transition: opacity .32s ease, transform .32s ease;
+  }
+  .card.fade{ opacity:0; transform:translateY(6px); }
+
+  .quote-mark{
+    font-family:'Fraunces', serif;
+    font-size:38px;
+    color:var(--moss);
+    line-height:1;
+    margin-bottom:6px;
+    opacity:.85;
+    font-weight:500;
+  }
+
+  .quote-text{
+    font-family:'Fraunces', serif;
+    font-weight:500;
+    font-size:clamp(20px, 3.4vw, 27px);
+    line-height:1.45;
+    color:var(--ink);
+    margin: 0 0 26px;
+    font-optical-sizing:auto;
+  }
+
+  .meta{ display:flex; flex-direction:column; align-items:center; gap:4px; }
+  .meta.hidden-meta{ display:none; }
+
+  .author{
+    font-family:'Inter', sans-serif;
+    font-weight:600;
+    font-size:14px;
+    color:var(--ink);
+    letter-spacing:.01em;
+  }
+  .book-ref{
+    font-family:'JetBrains Mono', monospace;
+    font-size:12px;
+    color:var(--stone);
+  }
+
+  .tags-row{
+    display:flex;
+    flex-wrap:wrap;
+    justify-content:center;
+    gap:6px;
+    margin-top:16px;
+  }
+  .tags-row.hidden-meta{ display:none; }
+  .pill{
+    font-family:'JetBrains Mono', monospace;
+    font-size:10.5px;
+    padding:4px 10px;
+    border-radius:20px;
+    background:var(--moss-soft);
+    color:var(--moss);
+  }
+
+  .controls{
+    display:flex;
+    gap:10px;
+    justify-content:center;
+    margin-top:26px;
+  }
+  .ctrl-btn{
+    font-family:'Inter', sans-serif;
+    font-size:13.5px;
+    font-weight:500;
+    padding:12px 20px;
+    border-radius:30px;
+    border:1px solid var(--stone-line);
+    background:var(--card);
+    color:var(--ink);
+    cursor:pointer;
+    display:flex;
+    align-items:center;
+    gap:7px;
+    transition: background .18s ease, border-color .18s ease, transform .12s ease;
+  }
+  .ctrl-btn:hover{ background:var(--moss-soft); border-color:var(--moss); }
+  .ctrl-btn:active{ transform:scale(.97); }
+  .ctrl-btn svg{ width:14px; height:14px; }
+  .ctrl-btn.primary{
+    background:var(--ink);
+    color:var(--bg);
+    border-color:var(--ink);
+  }
+  .ctrl-btn.primary:hover{ background:var(--moss); border-color:var(--moss); }
+
+  .filter-note{
+    text-align:center;
+    font-family:'JetBrains Mono', monospace;
+    font-size:11px;
+    color:var(--stone);
+    margin-top:14px;
+  }
+  .filter-note button{
+    background:none; border:none;
+    color:var(--moss);
+    font-family:inherit;
+    font-size:inherit;
+    text-decoration:underline;
+    cursor:pointer;
+    padding:0;
+  }
+
+  .empty-state{
+    text-align:center;
+    padding:60px 20px;
+    color:var(--stone);
+    font-family:'Inter', sans-serif;
+    font-size:14px;
+  }
+
+  .loading{
+    text-align:center;
+    color:var(--stone);
+    font-family:'JetBrains Mono', monospace;
+    font-size:12px;
+    letter-spacing:.05em;
+  }
+
+  footer{
+    text-align:center;
+    padding: 10px 20px max(16px, env(safe-area-inset-bottom));
+    font-family:'JetBrains Mono', monospace;
+    font-size:10.5px;
+    color:var(--stone);
+    position:relative;
+    z-index:5;
+  }
+
+  @media (max-width:420px){
+    .card{ padding:34px 22px 26px; }
+    .controls{ flex-direction:column; }
+    .ctrl-btn{ justify-content:center; }
+  }
+
+  @media (prefers-reduced-motion: reduce){
+    .card, .switch::after, .menu-btn, .ctrl-btn{ transition:none; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">Stoa</div>
+  <div class="menu-wrap">
+    <button class="menu-btn" id="menuBtn" aria-label="Menu">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="5" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.4" fill="currentColor" stroke="none"/></svg>
+    </button>
+    <div class="dropdown" id="dropdown">
+      <div class="dd-section">
+        <div class="dd-label">Display</div>
+        <div class="toggle-row">
+          <span>Show author, book & tags</span>
+          <div class="switch on" id="toggleMeta"></div>
+        </div>
+        <div class="toggle-row">
+          <span>Language</span>
+          <div class="switch" id="toggleLang"></div>
+        </div>
+        <div style="font-family:'JetBrains Mono', monospace; font-size:10px; color:var(--stone); text-align:right; margin-top:-4px;" id="langLabel">EN</div>
+      </div>
+      <div class="dd-divider"></div>
+      <div class="dd-section">
+        <div class="dd-label">Filter by tags</div>
+        <div class="tag-list" id="tagList"></div>
+      </div>
+      <div class="dd-divider"></div>
+      <div class="dd-section">
+        <button class="dd-btn" id="newBatchBtn">
+          <span>New quotes (latest batch)</span>
+          <span class="count" id="newBatchCount">0</span>
+        </button>
+        <button class="dd-btn" id="resetBtn">
+          <span>Reset filters</span>
+        </button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main>
+  <div class="stage">
+    <div id="cardWrap">
+      <div class="loading">Reading the Excel file…</div>
+    </div>
+    <div class="filter-note" id="filterNote" style="display:none;"></div>
+  </div>
+</main>
+
+<footer>quiet reading · install for offline use</footer>
+
+<script>
+(function(){
+  const EXCEL_PATH = 'quotes.xlsx';
+  const LS_KEY = 'stoa_quotes_v1';
+  const LS_STATE = 'stoa_state_v1';
+
+  let quotes = [];
+  let current = null;
+  let showMeta = true;
+  let lang = 'en';
+  let selectedTags = [];
+  let filterMode = 'none'; // 'none' | 'tags' | 'new'
+  let lastBatchDate = null;
+
+  const cardWrap = document.getElementById('cardWrap');
+  const filterNote = document.getElementById('filterNote');
+  const dropdown = document.getElementById('dropdown');
+  const menuBtn = document.getElementById('menuBtn');
+  const toggleMeta = document.getElementById('toggleMeta');
+  const toggleLang = document.getElementById('toggleLang');
+  const langLabel = document.getElementById('langLabel');
+  const tagList = document.getElementById('tagList');
+  const newBatchBtn = document.getElementById('newBatchBtn');
+  const newBatchCount = document.getElementById('newBatchCount');
+  const resetBtn = document.getElementById('resetBtn');
+
+  function saveState(){
+    localStorage.setItem(LS_STATE, JSON.stringify({showMeta, lang, selectedTags, filterMode}));
+  }
+  function loadState(){
+    try{
+      const s = JSON.parse(localStorage.getItem(LS_STATE));
+      if(s){
+        showMeta = s.showMeta ?? true;
+        lang = s.lang ?? 'en';
+        selectedTags = s.selectedTags ?? [];
+        filterMode = s.filterMode ?? 'none';
+      }
+    }catch(e){}
+  }
+
+  function parseTags(str){
+    if(!str) return [];
+    return String(str).split(',').map(t=>t.trim().toLowerCase()).filter(Boolean);
+  }
+
+  function normalizeRow(r){
+    return {
+      author: (r.author||'').toString().trim(),
+      book: (r.book||'').toString().trim(),
+      reference: (r.reference||'').toString().trim(),
+      quote: (r.quote||'').toString().trim(),
+      date_added: (r.date_added||'').toString().trim(),
+      tags: parseTags(r.tags),
+      quote_es: (r.quote_es||'').toString().trim(),
+      book_es: (r.book_es||'').toString().trim(),
+      tags_es: parseTags(r.tags_es),
+    };
+  }
+
+  async function loadExcel(){
+    try{
+      const res = await fetch(EXCEL_PATH, {cache:'no-store'});
+      const buf = await res.arrayBuffer();
+      const wb = XLSX.read(buf, {type:'array', cellDates:false});
+      let rows = [];
+      wb.SheetNames.forEach(name=>{
+        const sheet = wb.Sheets[name];
+        const json = XLSX.utils.sheet_to_json(sheet, {defval:''});
+        rows = rows.concat(json);
+      });
+      quotes = rows.map(normalizeRow).filter(q=>q.quote);
+      localStorage.setItem(LS_KEY, JSON.stringify(quotes));
+    }catch(e){
+      const cached = localStorage.getItem(LS_KEY);
+      if(cached){ quotes = JSON.parse(cached); }
+      else{
+        cardWrap.innerHTML = `<div class="empty-state">Couldn't load quotes.xlsx and no offline copy was found.<br>Make sure quotes.xlsx sits next to index.html.</div>`;
+        return false;
+      }
+    }
+    return quotes.length > 0;
+  }
+
+  function computeLastBatchDate(){
+    const dates = quotes.map(q=>q.date_added).filter(Boolean).sort();
+    lastBatchDate = dates.length ? dates[dates.length-1] : null;
+  }
+
+  function allTags(){
+    const set = new Set();
+    quotes.forEach(q=>{
+      const t = lang==='es' && q.tags_es.length ? q.tags_es : q.tags;
+      t.forEach(x=>set.add(x));
+    });
+    return Array.from(set).sort();
+  }
+
+  function renderTagList(){
+    const tags = allTags();
+    tagList.innerHTML = '';
+    tags.forEach(tag=>{
+      const chip = document.createElement('button');
+      chip.className = 'tag-chip' + (selectedTags.includes(tag) ? ' selected' : '');
+      chip.textContent = tag;
+      chip.onclick = ()=>{
+        if(selectedTags.includes(tag)){
+          selectedTags = selectedTags.filter(t=>t!==tag);
+        } else {
+          selectedTags.push(tag);
+        }
+        filterMode = selectedTags.length ? 'tags' : 'none';
+        saveState();
+        renderTagList();
+        updateFilterNote();
+        pickQuote();
+      };
+      tagList.appendChild(chip);
+    });
+  }
+
+  function tagsOf(q){
+    return lang==='es' && q.tags_es.length ? q.tags_es : q.tags;
+  }
+
+  function matchScore(q){
+    if(!selectedTags.length) return 0;
+    const t = tagsOf(q);
+    return selectedTags.filter(st=>t.includes(st)).length;
+  }
+
+  function candidatePool(){
+    if(filterMode === 'new' && lastBatchDate){
+      return quotes.filter(q=>q.date_added === lastBatchDate);
+    }
+    if(filterMode === 'tags' && selectedTags.length){
+      const scored = quotes.map(q=>({q, score:matchScore(q)})).filter(x=>x.score>0);
+      if(!scored.length) return [];
+      const maxScore = Math.max(...scored.map(x=>x.score));
+      // prefer full matches, but fall back through all matched levels
+      for(let s=maxScore; s>=1; s--){
+        const atLevel = scored.filter(x=>x.score===s).map(x=>x.q);
+        if(atLevel.length) return atLevel;
+      }
+    }
+    return quotes;
+  }
+
+  function similarPool(seed){
+    const t = tagsOf(seed);
+    if(!t.length) return quotes;
+    const scored = quotes
+      .filter(q=>q!==seed)
+      .map(q=>({q, score: tagsOf(q).filter(x=>t.includes(x)).length}))
+      .filter(x=>x.score>0);
+    if(!scored.length) return quotes.filter(q=>q!==seed);
+    const maxScore = Math.max(...scored.map(x=>x.score));
+    return scored.filter(x=>x.score===maxScore).map(x=>x.q);
+  }
+
+  function pickQuote(useSimilar){
+    let pool;
+    if(useSimilar && current){
+      pool = similarPool(current);
+    } else {
+      pool = candidatePool();
+    }
+    if(!pool.length){
+      renderEmpty();
+      return;
+    }
+    let next = pool[Math.floor(Math.random()*pool.length)];
+    if(pool.length > 1 && next === current){
+      next = pool[(pool.indexOf(next)+1) % pool.length];
+    }
+    current = next;
+    renderCard(true);
+  }
+
+  function renderEmpty(){
+    cardWrap.innerHTML = `<div class="card"><div class="empty-state">No quotes match this filter yet.<br>Try a different tag combination.</div></div>`;
+  }
+
+  function esc(s){
+    const d = document.createElement('div');
+    d.textContent = s;
+    return d.innerHTML;
+  }
+
+  function renderCard(animate){
+    if(!current) return;
+    const existing = cardWrap.querySelector('.card');
+    const build = ()=>{
+      const text = lang==='es' && current.quote_es ? current.quote_es : current.quote;
+      const book = lang==='es' && current.book_es ? current.book_es : current.book;
+      const tags = tagsOf(current);
+      const metaClass = showMeta ? '' : ' hidden-meta';
+      cardWrap.innerHTML = `
+        <div class="card">
+          <div class="quote-mark">"</div>
+          <p class="quote-text">${esc(text)}</p>
+          <div class="meta${metaClass}">
+            <div class="author">${esc(current.author)}</div>
+            <div class="book-ref">${esc(book)}${current.reference ? ' · ' + esc(current.reference) : ''}</div>
+          </div>
+          <div class="tags-row${metaClass}">
+            ${tags.map(t=>`<span class="pill">${esc(t)}</span>`).join('')}
+          </div>
+          <div class="controls">
+            <button class="ctrl-btn" id="similarBtn">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 12h16M4 6h10M4 18h10"/></svg>
+              Similar
+            </button>
+            <button class="ctrl-btn primary" id="randomBtn">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M17 3l4 4-4 4M3 7h13M7 21l-4-4 4-4M21 17H8"/></svg>
+              Next
+            </button>
+          </div>
+        </div>
+      `;
+      document.getElementById('randomBtn').onclick = ()=>pickQuote(false);
+      document.getElementById('similarBtn').onclick = ()=>pickQuote(true);
+    };
+    if(animate && existing){
+      existing.classList.add('fade');
+      setTimeout(build, 220);
+    } else {
+      build();
+    }
+  }
+
+  function updateFilterNote(){
+    if(filterMode === 'tags' && selectedTags.length){
+      filterNote.style.display = 'block';
+      filterNote.innerHTML = `Filtering by: ${selectedTags.join(', ')} — <button id="clearFilterBtn">clear</button>`;
+      document.getElementById('clearFilterBtn').onclick = ()=>{
+        selectedTags = [];
+        filterMode = 'none';
+        saveState();
+        renderTagList();
+        updateFilterNote();
+        pickQuote();
+      };
+    } else if(filterMode === 'new'){
+      filterNote.style.display = 'block';
+      filterNote.innerHTML = `Showing latest batch (${lastBatchDate || '—'}) — <button id="clearFilterBtn">clear</button>`;
+      document.getElementById('clearFilterBtn').onclick = ()=>{
+        filterMode = 'none';
+        saveState();
+        updateFilterNote();
+        pickQuote();
+      };
+    } else {
+      filterNote.style.display = 'none';
+    }
+  }
+
+  // Dropdown open/close
+  menuBtn.addEventListener('click', (e)=>{
+    e.stopPropagation();
+    dropdown.classList.toggle('open');
+  });
+  document.addEventListener('click', (e)=>{
+    if(!dropdown.contains(e.target) && e.target!==menuBtn){
+      dropdown.classList.remove('open');
+    }
+  });
+
+  toggleMeta.addEventListener('click', ()=>{
+    showMeta = !showMeta;
+    toggleMeta.classList.toggle('on', showMeta);
+    saveState();
+    renderCard(false);
+  });
+
+  toggleLang.addEventListener('click', ()=>{
+    lang = lang === 'en' ? 'es' : 'en';
+    toggleLang.classList.toggle('on', lang==='es');
+    langLabel.textContent = lang==='en' ? 'EN' : 'ES';
+    saveState();
+    renderTagList();
+    renderCard(true);
+  });
+
+  newBatchBtn.addEventListener('click', ()=>{
+    filterMode = filterMode === 'new' ? 'none' : 'new';
+    selectedTags = [];
+    saveState();
+    renderTagList();
+    updateFilterNote();
+    pickQuote();
+    dropdown.classList.remove('open');
+  });
+
+  resetBtn.addEventListener('click', ()=>{
+    selectedTags = [];
+    filterMode = 'none';
+    saveState();
+    renderTagList();
+    updateFilterNote();
+    pickQuote();
+  });
+
+  async function init(){
+    loadState();
+    toggleMeta.classList.toggle('on', showMeta);
+    toggleLang.classList.toggle('on', lang==='es');
+    langLabel.textContent = lang==='en' ? 'EN' : 'ES';
+
+    const ok = await loadExcel();
+    if(!ok) return;
+
+    computeLastBatchDate();
+    const newCount = lastBatchDate ? quotes.filter(q=>q.date_added===lastBatchDate).length : 0;
+    newBatchCount.textContent = newCount;
+
+    renderTagList();
+    updateFilterNote();
+    pickQuote();
+  }
+
+  init();
+
+  if('serviceWorker' in navigator){
+    window.addEventListener('load', ()=>{
+      navigator.serviceWorker.register('sw.js').catch(()=>{});
+    });
+  }
+})();
+</script>
+</body>
+</html>
