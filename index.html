@@ -616,7 +616,7 @@
     if(!current) return;
     if(lock === undefined) lock = true;
     const existing = cardWrap.querySelector('.card');
-    const STEP_MS = lock ? 55 : 0;   // delay between each word starting its reveal
+    const STEP_MS = lock ? 100 : 0;   // delay between each word starting its reveal
     const WORD_DUR = 500;             // matches the revealWord animation duration
 
     const build = ()=>{
