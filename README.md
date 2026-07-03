@@ -1,4 +1,4 @@
-# Stoa — Quote Visor
+# Arete — Quote Visor
 
 A minimalist, installable PWA that reads Stoic quotes from an Excel file in the repo.
 

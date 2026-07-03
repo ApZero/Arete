@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <meta name="theme-color" content="#EDEEEA">
-<title>Stoa — Quote Visor</title>
+<title>Arete — Quote Visor</title>
 <link rel="manifest" href="manifest.json">
 <link rel="apple-touch-icon" href="icon-192.png">
 <link rel="icon" href="icon-192.png">
@@ -226,6 +226,26 @@
     font-optical-sizing:auto;
   }
 
+  .word{
+    display:inline-block;
+    opacity:0;
+    filter:blur(3px);
+    transform:translateY(4px);
+    animation: revealWord .5s ease forwards;
+  }
+  @keyframes revealWord{
+    to{ opacity:1; filter:blur(0); transform:translateY(0); }
+  }
+  @media (prefers-reduced-motion: reduce){
+    .word{ animation:none; opacity:1; filter:none; transform:none; }
+  }
+
+  .ctrl-btn:disabled{
+    opacity:.35;
+    cursor:default;
+    pointer-events:none;
+  }
+
   .meta{ display:flex; flex-direction:column; align-items:center; gap:4px; }
   .meta.hidden-meta{ display:none; }
 
@@ -347,7 +367,7 @@
 <body>
 
 <header>
-  <div class="brand">Stoa</div>
+  <div class="brand">Arete</div>
   <div class="menu-wrap">
     <button class="menu-btn" id="menuBtn" aria-label="Menu">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="5" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.4" fill="currentColor" stroke="none"/></svg>
@@ -484,9 +504,17 @@
     lastBatchDate = dates.length ? dates[dates.length-1] : null;
   }
 
+  function hasLang(q){
+    return lang === 'en' || !!q.quote_es;
+  }
+
+  function langPool(){
+    return quotes.filter(hasLang);
+  }
+
   function allTags(){
     const set = new Set();
-    quotes.forEach(q=>{
+    langPool().forEach(q=>{
       const t = lang==='es' && q.tags_es.length ? q.tags_es : q.tags;
       t.forEach(x=>set.add(x));
     });
@@ -584,18 +612,28 @@
     return d.innerHTML;
   }
 
-  function renderCard(animate){
+  function renderCard(animate, lock){
     if(!current) return;
+    if(lock === undefined) lock = true;
     const existing = cardWrap.querySelector('.card');
+    const STEP_MS = lock ? 55 : 0;   // delay between each word starting its reveal
+    const WORD_DUR = 500;             // matches the revealWord animation duration
+
     const build = ()=>{
       const text = lang==='es' && current.quote_es ? current.quote_es : current.quote;
       const book = lang==='es' && current.book_es ? current.book_es : current.book;
       const tags = tagsOf(current);
       const metaClass = showMeta ? '' : ' hidden-meta';
+
+      const words = text.split(/\s+/).filter(Boolean);
+      const wordsHtml = words.map((w, i)=>
+        `<span class="word" style="animation-delay:${(i*STEP_MS)}ms">${esc(w)}</span>`
+      ).join(' ');
+
       cardWrap.innerHTML = `
         <div class="card">
           <div class="quote-mark">"</div>
-          <p class="quote-text">${esc(text)}</p>
+          <p class="quote-text">${wordsHtml}</p>
           <div class="meta${metaClass}">
             <div class="author">${esc(current.author)}</div>
             <div class="book-ref">${esc(book)}${current.reference ? ' · ' + esc(current.reference) : ''}</div>
@@ -604,19 +642,33 @@
             ${tags.map(t=>`<span class="pill">${esc(t)}</span>`).join('')}
           </div>
           <div class="controls">
-            <button class="ctrl-btn" id="similarBtn">
+            <button class="ctrl-btn" id="similarBtn" disabled>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 12h16M4 6h10M4 18h10"/></svg>
               Similar
             </button>
-            <button class="ctrl-btn primary" id="randomBtn">
+            <button class="ctrl-btn primary" id="randomBtn" disabled>
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M17 3l4 4-4 4M3 7h13M7 21l-4-4 4-4M21 17H8"/></svg>
               Next
             </button>
           </div>
         </div>
       `;
-      document.getElementById('randomBtn').onclick = ()=>pickQuote(false);
-      document.getElementById('similarBtn').onclick = ()=>pickQuote(true);
+      const randomBtn = document.getElementById('randomBtn');
+      const similarBtn = document.getElementById('similarBtn');
+      randomBtn.onclick = ()=>pickQuote(false);
+      similarBtn.onclick = ()=>pickQuote(true);
+
+      if(!lock){
+        randomBtn.disabled = false;
+        similarBtn.disabled = false;
+        return;
+      }
+      const revealTotal = words.length * STEP_MS + WORD_DUR;
+      const prefersReduced = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+      setTimeout(()=>{
+        randomBtn.disabled = false;
+        similarBtn.disabled = false;
+      }, prefersReduced ? 0 : revealTotal);
     };
     if(animate && existing){
       existing.classList.add('fade');
@@ -667,7 +719,7 @@
     showMeta = !showMeta;
     toggleMeta.classList.toggle('on', showMeta);
     saveState();
-    renderCard(false);
+    renderCard(false, false);
   });
 
   toggleLang.addEventListener('click', ()=>{

@@ -1,6 +1,6 @@
 {
-  "name": "Stoa — Quote Visor",
-  "short_name": "Stoa",
+  "name": "Arete — Quote Visor",
+  "short_name": "Arete",
   "description": "A quiet, minimalist Stoic quote reader.",
   "start_url": "./index.html",
   "scope": "./",
