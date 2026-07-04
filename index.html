@@ -63,7 +63,7 @@
   body.focus-mode header{ opacity:0; pointer-events:none; }
   body.focus-mode .controls{ opacity:0; pointer-events:none; }
   body.focus-mode .filter-note{ opacity:0; pointer-events:none; }
-  body.focus-mode footer{ opacity:1; }
+  body.focus-mode footer{ opacity:0; pointer-events:none; }
   .brand{
     font-family:'Fraunces', serif;
     font-size:15px;
@@ -366,6 +366,7 @@
     color:var(--stone);
     position:relative;
     z-index:5;
+    transition: opacity .3s ease;
   }
 
   @media (max-width:420px){
@@ -392,10 +393,6 @@
         <div class="toggle-row">
           <span>Show author, book & tags</span>
           <div class="switch on" id="toggleMeta"></div>
-        </div>
-        <div class="toggle-row">
-          <span>Screenshot mode (hide controls)</span>
-          <div class="switch" id="toggleFocus"></div>
         </div>
         <div class="toggle-row">
           <span>Language</span>
@@ -459,22 +456,14 @@
   const newBatchCount = document.getElementById('newBatchCount');
   const resetBtn = document.getElementById('resetBtn');
   const brandName = document.getElementById('brandName');
-  const toggleFocus = document.getElementById('toggleFocus');
 
   let focusMode = false;
   function setFocusMode(on){
     focusMode = on;
     document.body.classList.toggle('focus-mode', on);
-    toggleFocus.classList.toggle('on', on);
-    if(on) dropdown.classList.remove('open');
   }
 
-  toggleFocus.addEventListener('click', (e)=>{
-    e.stopPropagation();
-    setFocusMode(!focusMode);
-  });
-
-  // Tapping the quote card itself also toggles screenshot mode, in or out.
+  // Tapping the quote card toggles screenshot mode: hides header, controls & footer.
   cardWrap.addEventListener('click', (e)=>{
     if(e.target.closest('.controls')) return;
     if(e.target.closest('.card')){
@@ -835,8 +824,14 @@
 
   if('serviceWorker' in navigator){
     window.addEventListener('load', ()=>{
-      navigator.serviceWorker.register('sw.js').catch(()=>{});
+      navigator.serviceWorker.register('sw.js').then(reg=>{
+        console.log('Service worker registered:', reg.scope);
+      }).catch(err=>{
+        console.error('Service worker registration failed:', err);
+      });
     });
+  } else {
+    console.warn('serviceWorker not supported in this browser context.');
   }
 })();
 </script>
