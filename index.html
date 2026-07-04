@@ -57,7 +57,12 @@
     padding: max(18px, env(safe-area-inset-top)) 20px 12px;
     position:relative;
     z-index:20;
+    transition: opacity .3s ease;
   }
+
+  body.focus-mode header{ opacity:0; pointer-events:none; }
+  body.focus-mode .controls{ opacity:0; pointer-events:none; }
+  body.focus-mode .filter-note{ opacity:0; pointer-events:none; }
   .brand{
     font-family:'Fraunces', serif;
     font-size:15px;
@@ -65,7 +70,12 @@
     text-transform:uppercase;
     color:var(--ink-soft);
     font-weight:500;
+    cursor:pointer;
+    transition: opacity .38s ease, filter .38s ease;
+    user-select:none;
+    min-width:52px;
   }
+  .brand.swapping{ opacity:0; filter:blur(3px); }
 
   .menu-wrap{ position:relative; }
   .menu-btn{
@@ -203,6 +213,7 @@
     opacity:1;
     transform:translateY(0);
     transition: opacity .32s ease, transform .32s ease;
+    cursor:pointer;
   }
   .card.fade{ opacity:0; transform:translateY(6px); }
 
@@ -281,15 +292,16 @@
 
   .controls{
     display:flex;
-    gap:10px;
+    gap:6px;
     justify-content:center;
     margin-top:26px;
+    transition: opacity .3s ease;
   }
   .ctrl-btn{
     font-family:'Inter', sans-serif;
-    font-size:13.5px;
+    font-size:13px;
     font-weight:500;
-    padding:12px 20px;
+    padding:9px 16px;
     border-radius:30px;
     border:1px solid var(--stone-line);
     background:var(--card);
@@ -297,18 +309,19 @@
     cursor:pointer;
     display:flex;
     align-items:center;
-    gap:7px;
-    transition: background .18s ease, border-color .18s ease, transform .12s ease;
+    gap:6px;
+    opacity:.55;
+    transition: background .18s ease, border-color .18s ease, transform .12s ease, opacity .18s ease;
   }
-  .ctrl-btn:hover{ background:var(--moss-soft); border-color:var(--moss); }
+  .ctrl-btn:hover{ background:var(--moss-soft); border-color:var(--moss); opacity:1; }
   .ctrl-btn:active{ transform:scale(.97); }
-  .ctrl-btn svg{ width:14px; height:14px; }
+  .ctrl-btn svg{ width:13px; height:13px; }
   .ctrl-btn.primary{
     background:var(--ink);
     color:var(--bg);
     border-color:var(--ink);
   }
-  .ctrl-btn.primary:hover{ background:var(--moss); border-color:var(--moss); }
+  .ctrl-btn.primary:hover{ background:var(--moss); border-color:var(--moss); opacity:1; }
 
   .filter-note{
     text-align:center;
@@ -316,6 +329,7 @@
     font-size:11px;
     color:var(--stone);
     margin-top:14px;
+    transition: opacity .3s ease;
   }
   .filter-note button{
     background:none; border:none;
@@ -355,8 +369,7 @@
 
   @media (max-width:420px){
     .card{ padding:34px 22px 26px; }
-    .controls{ flex-direction:column; }
-    .ctrl-btn{ justify-content:center; }
+    .ctrl-btn{ font-size:12px; padding:8px 13px; }
   }
 
   @media (prefers-reduced-motion: reduce){
@@ -367,7 +380,7 @@
 <body>
 
 <header>
-  <div class="brand">Arete</div>
+  <div class="brand" id="brandName">Arete</div>
   <div class="menu-wrap">
     <button class="menu-btn" id="menuBtn" aria-label="Menu">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="5" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none"/><circle cx="19" cy="12" r="1.4" fill="currentColor" stroke="none"/></svg>
@@ -378,6 +391,10 @@
         <div class="toggle-row">
           <span>Show author, book & tags</span>
           <div class="switch on" id="toggleMeta"></div>
+        </div>
+        <div class="toggle-row">
+          <span>Screenshot mode (hide controls)</span>
+          <div class="switch" id="toggleFocus"></div>
         </div>
         <div class="toggle-row">
           <span>Language</span>
@@ -440,6 +457,51 @@
   const newBatchBtn = document.getElementById('newBatchBtn');
   const newBatchCount = document.getElementById('newBatchCount');
   const resetBtn = document.getElementById('resetBtn');
+  const brandName = document.getElementById('brandName');
+  const toggleFocus = document.getElementById('toggleFocus');
+
+  let focusMode = false;
+  function setFocusMode(on){
+    focusMode = on;
+    document.body.classList.toggle('focus-mode', on);
+    toggleFocus.classList.toggle('on', on);
+    if(on) dropdown.classList.remove('open');
+  }
+
+  toggleFocus.addEventListener('click', (e)=>{
+    e.stopPropagation();
+    setFocusMode(!focusMode);
+  });
+
+  // Tapping the quote card itself also toggles screenshot mode, in or out.
+  cardWrap.addEventListener('click', (e)=>{
+    if(e.target.closest('.controls')) return;
+    if(e.target.closest('.card')){
+      setFocusMode(!focusMode);
+    }
+  });
+
+  let brandRevertTimer = null;
+  function swapBrand(text){
+    brandName.classList.add('swapping');
+    setTimeout(()=>{
+      brandName.textContent = text;
+      brandName.classList.remove('swapping');
+    }, 380);
+  }
+  brandName.addEventListener('mouseenter', ()=>{
+    clearTimeout(brandRevertTimer);
+    swapBrand('Virtue');
+  });
+  brandName.addEventListener('mouseleave', ()=>{
+    clearTimeout(brandRevertTimer);
+    swapBrand('Arete');
+  });
+  brandName.addEventListener('click', ()=>{
+    swapBrand('Virtue');
+    clearTimeout(brandRevertTimer);
+    brandRevertTimer = setTimeout(()=>swapBrand('Arete'), 1300);
+  });
 
   function saveState(){
     localStorage.setItem(LS_STATE, JSON.stringify({showMeta, lang, selectedTags, filterMode}));
