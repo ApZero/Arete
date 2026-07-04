@@ -63,6 +63,7 @@
   body.focus-mode header{ opacity:0; pointer-events:none; }
   body.focus-mode .controls{ opacity:0; pointer-events:none; }
   body.focus-mode .filter-note{ opacity:0; pointer-events:none; }
+  body.focus-mode footer{ opacity:1; }
   .brand{
     font-family:'Fraunces', serif;
     font-size:15px;
@@ -294,7 +295,7 @@
     display:flex;
     gap:6px;
     justify-content:center;
-    margin-top:26px;
+    margin-top:18px;
     transition: opacity .3s ease;
   }
   .ctrl-btn{
@@ -703,16 +704,16 @@
           <div class="tags-row${metaClass}">
             ${tags.map(t=>`<span class="pill">${esc(t)}</span>`).join('')}
           </div>
-          <div class="controls">
-            <button class="ctrl-btn" id="similarBtn" disabled>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 12h16M4 6h10M4 18h10"/></svg>
-              Similar
-            </button>
-            <button class="ctrl-btn primary" id="randomBtn" disabled>
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M17 3l4 4-4 4M3 7h13M7 21l-4-4 4-4M21 17H8"/></svg>
-              Next
-            </button>
-          </div>
+        </div>
+        <div class="controls">
+          <button class="ctrl-btn" id="similarBtn" disabled>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 12h16M4 6h10M4 18h10"/></svg>
+            Similar
+          </button>
+          <button class="ctrl-btn primary" id="randomBtn" disabled>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M17 3l4 4-4 4M3 7h13M7 21l-4-4 4-4M21 17H8"/></svg>
+            Next
+          </button>
         </div>
       `;
       const randomBtn = document.getElementById('randomBtn');
