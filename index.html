@@ -136,6 +136,10 @@
     cursor:pointer;
     transition: background .2s ease;
     flex-shrink:0;
+    border:none;
+    padding:0;
+    -webkit-appearance:none;
+    appearance:none;
   }
   .switch.on{ background:var(--moss); }
   .switch::after{
@@ -369,6 +373,28 @@
     transition: opacity .3s ease;
   }
 
+  /* TV remote / keyboard navigation: make focus clearly visible since there's no mouse cursor */
+  button:focus-visible,
+  .tag-chip:focus-visible,
+  .switch:focus-visible,
+  .brand:focus-visible{
+    outline: 3px solid var(--moss);
+    outline-offset: 3px;
+  }
+  .ctrl-btn:focus-visible{ opacity:1; }
+
+  /* Large screens / TVs viewed from a distance: bigger everything */
+  @media (min-width: 1200px){
+    .stage{ max-width: 780px; }
+    .quote-text{ font-size: clamp(28px, 2.6vw, 40px); }
+    .author{ font-size:17px; }
+    .book-ref{ font-size:14px; }
+    .pill{ font-size:12px; padding:5px 12px; }
+    .ctrl-btn{ padding:14px 22px; }
+    .ctrl-btn svg{ width:18px; height:18px; }
+    .brand{ font-size:18px; }
+  }
+
   @media (max-width:420px){
     .card{ padding:34px 22px 26px; }
     .ctrl-btn{ font-size:12px; padding:8px 13px; }
@@ -392,11 +418,11 @@
         <div class="dd-label">Display</div>
         <div class="toggle-row">
           <span>Show author, book & tags</span>
-          <div class="switch on" id="toggleMeta"></div>
+          <button class="switch on" id="toggleMeta" role="switch" aria-checked="true" aria-label="Show author, book & tags"></button>
         </div>
         <div class="toggle-row">
           <span>Language</span>
-          <div class="switch" id="toggleLang"></div>
+          <button class="switch" id="toggleLang" role="switch" aria-checked="false" aria-label="Toggle language"></button>
         </div>
         <div style="font-family:'JetBrains Mono', monospace; font-size:10px; color:var(--stone); text-align:right; margin-top:-4px;" id="langLabel">EN</div>
       </div>
@@ -457,10 +483,17 @@
   const resetBtn = document.getElementById('resetBtn');
   const brandName = document.getElementById('brandName');
 
+  const AUTO_ADVANCE_MS = 15000; // how often quotes change automatically in focus mode
+
   let focusMode = false;
+  let autoAdvanceTimer = null;
   function setFocusMode(on){
     focusMode = on;
     document.body.classList.toggle('focus-mode', on);
+    clearInterval(autoAdvanceTimer);
+    if(on){
+      autoAdvanceTimer = setInterval(()=>pickQuote(false), AUTO_ADVANCE_MS);
+    }
   }
 
   // Tapping the quote card toggles screenshot mode: hides header, controls & footer.
@@ -695,20 +728,23 @@
           </div>
         </div>
         <div class="controls">
-          <button class="ctrl-btn" id="similarBtn" disabled>
+          <button class="ctrl-btn" id="similarBtn" aria-label="Similar quotes" title="Similar quotes" disabled>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 12h16M4 6h10M4 18h10"/></svg>
-            Similar
           </button>
-          <button class="ctrl-btn primary" id="randomBtn" disabled>
+          <button class="ctrl-btn primary" id="randomBtn" aria-label="Next quote" title="Next quote" disabled>
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M17 3l4 4-4 4M3 7h13M7 21l-4-4 4-4M21 17H8"/></svg>
-            Next
+          </button>
+          <button class="ctrl-btn" id="focusBtn" aria-label="Focus mode" title="Focus mode">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg>
           </button>
         </div>
       `;
       const randomBtn = document.getElementById('randomBtn');
       const similarBtn = document.getElementById('similarBtn');
+      const focusBtn = document.getElementById('focusBtn');
       randomBtn.onclick = ()=>pickQuote(false);
       similarBtn.onclick = ()=>pickQuote(true);
+      focusBtn.onclick = ()=>setFocusMode(!focusMode);
 
       if(!lock){
         randomBtn.disabled = false;
@@ -770,6 +806,7 @@
   toggleMeta.addEventListener('click', ()=>{
     showMeta = !showMeta;
     toggleMeta.classList.toggle('on', showMeta);
+    toggleMeta.setAttribute('aria-checked', String(showMeta));
     saveState();
     renderCard(false, false);
   });
@@ -777,6 +814,7 @@
   toggleLang.addEventListener('click', ()=>{
     lang = lang === 'en' ? 'es' : 'en';
     toggleLang.classList.toggle('on', lang==='es');
+    toggleLang.setAttribute('aria-checked', String(lang==='es'));
     langLabel.textContent = lang==='en' ? 'EN' : 'ES';
     saveState();
     renderTagList();
