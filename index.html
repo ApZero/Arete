@@ -23,6 +23,17 @@
     --moss-soft: #EAEFE9;
     --radius: 18px;
   }
+  body.dark-mode{
+    --bg: #1B1D1E;
+    --card: #24272A;
+    --ink: #EDEEEA;
+    --ink-soft: #C7C9C4;
+    --stone: #83857F;
+    --stone-line: #34373A;
+    --moss: #8CAE87;
+    --moss-soft: #2A3229;
+  }
+  body{ transition: background-color .35s ease; }
   *{box-sizing:border-box; -webkit-tap-highlight-color: transparent;}
   html,body{height:100%;}
   body{
@@ -424,6 +435,10 @@
           <span>Language</span>
           <button class="switch" id="toggleLang" role="switch" aria-checked="false" aria-label="Toggle language"></button>
         </div>
+        <div class="toggle-row">
+          <span>Dark mode</span>
+          <button class="switch" id="toggleDark" role="switch" aria-checked="false" aria-label="Toggle dark mode"></button>
+        </div>
         <div style="font-family:'JetBrains Mono', monospace; font-size:10px; color:var(--stone); text-align:right; margin-top:-4px;" id="langLabel">EN</div>
       </div>
       <div class="dd-divider"></div>
@@ -466,6 +481,7 @@
   let current = null;
   let showMeta = true;
   let lang = 'en';
+  let darkMode = false;
   let selectedTags = [];
   let filterMode = 'none'; // 'none' | 'tags' | 'new'
   let lastBatchDate = null;
@@ -476,6 +492,7 @@
   const menuBtn = document.getElementById('menuBtn');
   const toggleMeta = document.getElementById('toggleMeta');
   const toggleLang = document.getElementById('toggleLang');
+  const toggleDark = document.getElementById('toggleDark');
   const langLabel = document.getElementById('langLabel');
   const tagList = document.getElementById('tagList');
   const newBatchBtn = document.getElementById('newBatchBtn');
@@ -527,7 +544,7 @@
   });
 
   function saveState(){
-    localStorage.setItem(LS_STATE, JSON.stringify({showMeta, lang, selectedTags, filterMode}));
+    localStorage.setItem(LS_STATE, JSON.stringify({showMeta, lang, selectedTags, filterMode, darkMode}));
   }
   function loadState(){
     try{
@@ -537,8 +554,16 @@
         lang = s.lang ?? 'en';
         selectedTags = s.selectedTags ?? [];
         filterMode = s.filterMode ?? 'none';
+        darkMode = s.darkMode ?? false;
       }
     }catch(e){}
+  }
+
+  function applyDarkMode(on){
+    darkMode = on;
+    document.body.classList.toggle('dark-mode', on);
+    const meta = document.querySelector('meta[name="theme-color"]');
+    if(meta) meta.setAttribute('content', on ? '#1B1D1E' : '#EDEEEA');
   }
 
   function parseTags(str){
@@ -668,6 +693,8 @@
     return scored.filter(x=>x.score===maxScore).map(x=>x.q);
   }
 
+  let recentHistory = []; // last few quotes shown, to avoid near-term repeats
+
   function pickQuote(useSimilar){
     let pool;
     if(useSimilar && current){
@@ -679,11 +706,21 @@
       renderEmpty();
       return;
     }
-    let next = pool[Math.floor(Math.random()*pool.length)];
-    if(pool.length > 1 && next === current){
-      next = pool[(pool.indexOf(next)+1) % pool.length];
-    }
+
+    // Avoid repeating anything shown recently, scaled to how big the pool is.
+    const historyCap = Math.max(0, Math.min(recentHistory.length, pool.length - 1));
+    const recentSet = new Set(recentHistory.slice(-historyCap));
+    let choices = pool.filter(q => !recentSet.has(q) && q !== current);
+    if(!choices.length) choices = pool.filter(q => q !== current);
+    if(!choices.length) choices = pool;
+
+    const next = choices[Math.floor(Math.random() * choices.length)];
     current = next;
+
+    recentHistory.push(next);
+    const cap = Math.max(1, Math.min(8, pool.length - 1));
+    while(recentHistory.length > cap) recentHistory.shift();
+
     renderCard(true);
   }
 
@@ -795,12 +832,59 @@
   // Dropdown open/close
   menuBtn.addEventListener('click', (e)=>{
     e.stopPropagation();
+    const opening = !dropdown.classList.contains('open');
     dropdown.classList.toggle('open');
+    if(opening){
+      const first = getFocusables()[0];
+      if(first) first.focus();
+    }
   });
   document.addEventListener('click', (e)=>{
     if(!dropdown.contains(e.target) && e.target!==menuBtn){
       dropdown.classList.remove('open');
     }
+  });
+
+  // --- TV / D-pad navigation ---
+  // Many TV WebViews (including kiosk browsers) don't translate remote D-pad
+  // presses into native browser focus traversal, so we do it ourselves here.
+  function getFocusables(){
+    if(dropdown.classList.contains('open')){
+      return [toggleMeta, toggleLang, toggleDark, ...Array.from(tagList.querySelectorAll('.tag-chip')), newBatchBtn, resetBtn]
+        .filter(el => el && !el.disabled);
+    }
+    return [
+      document.getElementById('similarBtn'),
+      document.getElementById('randomBtn'),
+      document.getElementById('focusBtn'),
+      menuBtn
+    ].filter(el => el && !el.disabled);
+  }
+
+  document.addEventListener('keydown', (e)=>{
+    const nav = ['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'];
+    if(e.key === 'Escape' || e.key === 'Backspace'){
+      if(dropdown.classList.contains('open')){
+        dropdown.classList.remove('open');
+        menuBtn.focus();
+        e.preventDefault();
+      }
+      return;
+    }
+    if(!nav.includes(e.key)) return;
+
+    const list = getFocusables();
+    if(!list.length) return;
+    let idx = list.indexOf(document.activeElement);
+    if(idx === -1) idx = -1; // will become 0 below on ArrowDown/Right
+
+    if(e.key === 'ArrowDown' || e.key === 'ArrowRight'){
+      idx = (idx + 1) % list.length;
+    } else {
+      idx = (idx - 1 + list.length) % list.length;
+    }
+    list[idx].focus();
+    e.preventDefault();
   });
 
   toggleMeta.addEventListener('click', ()=>{
@@ -819,6 +903,13 @@
     saveState();
     renderTagList();
     renderCard(true);
+  });
+
+  toggleDark.addEventListener('click', ()=>{
+    applyDarkMode(!darkMode);
+    toggleDark.classList.toggle('on', darkMode);
+    toggleDark.setAttribute('aria-checked', String(darkMode));
+    saveState();
   });
 
   newBatchBtn.addEventListener('click', ()=>{
@@ -843,8 +934,13 @@
   async function init(){
     loadState();
     toggleMeta.classList.toggle('on', showMeta);
+    toggleMeta.setAttribute('aria-checked', String(showMeta));
     toggleLang.classList.toggle('on', lang==='es');
+    toggleLang.setAttribute('aria-checked', String(lang==='es'));
     langLabel.textContent = lang==='en' ? 'EN' : 'ES';
+    toggleDark.classList.toggle('on', darkMode);
+    toggleDark.setAttribute('aria-checked', String(darkMode));
+    applyDarkMode(darkMode);
 
     const ok = await loadExcel();
     if(!ok) return;
