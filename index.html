@@ -187,6 +187,60 @@
   }
   .dd-btn.active{ color:var(--moss); font-weight:600; }
 
+  .search-input{
+    width:100%;
+    font-family:'Inter', sans-serif;
+    font-size:13.5px;
+    color:var(--ink);
+    background:transparent;
+    border:none;
+    border-bottom:1px solid var(--stone-line);
+    padding:8px 6px;
+    outline:none;
+    -webkit-appearance:none;
+    appearance:none;
+  }
+  .search-input::placeholder{ color:var(--stone); }
+  .search-input:focus-visible{ border-bottom-color:var(--moss); }
+
+  .search-results{
+    max-height:220px;
+    overflow-y:auto;
+    margin-top:4px;
+  }
+  .search-result{
+    display:block;
+    width:100%;
+    text-align:left;
+    background:none;
+    border:none;
+    padding:8px 6px;
+    border-radius:8px;
+    cursor:pointer;
+    font-family:'Inter', sans-serif;
+  }
+  .search-result:hover{ background:var(--moss-soft); }
+  .search-result .snippet{
+    font-family:'Fraunces', serif;
+    font-size:13px;
+    color:var(--ink);
+    display:block;
+    line-height:1.4;
+  }
+  .search-result .src{
+    font-family:'JetBrains Mono', monospace;
+    font-size:10.5px;
+    color:var(--stone);
+    display:block;
+    margin-top:2px;
+  }
+  .search-empty{
+    font-family:'Inter', sans-serif;
+    font-size:12.5px;
+    color:var(--stone);
+    padding:8px 6px;
+  }
+
   .tag-list{ display:flex; flex-wrap:wrap; gap:6px; padding:4px 6px 8px; }
   .tag-chip{
     font-family:'JetBrains Mono', monospace;
@@ -443,6 +497,12 @@
       </div>
       <div class="dd-divider"></div>
       <div class="dd-section">
+        <div class="dd-label">Search</div>
+        <input type="search" id="searchInput" class="search-input" placeholder="Search quotes…" autocomplete="off">
+        <div class="search-results" id="searchResults"></div>
+      </div>
+      <div class="dd-divider"></div>
+      <div class="dd-section">
         <div class="dd-label">Filter by tags</div>
         <div class="tag-list" id="tagList"></div>
       </div>
@@ -495,6 +555,8 @@
   const toggleDark = document.getElementById('toggleDark');
   const langLabel = document.getElementById('langLabel');
   const tagList = document.getElementById('tagList');
+  const searchInput = document.getElementById('searchInput');
+  const searchResults = document.getElementById('searchResults');
   const newBatchBtn = document.getElementById('newBatchBtn');
   const newBatchCount = document.getElementById('newBatchCount');
   const resetBtn = document.getElementById('resetBtn');
@@ -657,6 +719,80 @@
   function tagsOf(q){
     return lang==='es' && q.tags_es.length ? q.tags_es : q.tags;
   }
+
+  // --- Search ---
+  function tokenize(str){
+    return (str || '')
+      .toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // strip accents so razón ~ razon
+      .match(/[a-z0-9']+/g) || [];
+  }
+
+  function searchableText(q){
+    const text = lang==='es' && q.quote_es ? q.quote_es : q.quote;
+    const book = lang==='es' && q.book_es ? q.book_es : q.book;
+    return [text, q.author, book, tagsOf(q).join(' ')].join(' ');
+  }
+
+  function scoreQuote(qWords, quote){
+    const tWords = tokenize(searchableText(quote));
+    if(!tWords.length) return null;
+
+    let free = 0;
+    qWords.forEach(qw=>{
+      if(tWords.some(tw => tw.includes(qw))) free++;
+    });
+    if(free === 0) return null;
+
+    // ordered: longest run of query words found as a subsequence, in order
+    let ordered = 0, tIdx = 0;
+    qWords.forEach(qw=>{
+      while(tIdx < tWords.length && !tWords[tIdx].includes(qw)) tIdx++;
+      if(tIdx < tWords.length){ ordered++; tIdx++; }
+    });
+
+    return { ordered, free };
+  }
+
+  function runSearch(query){
+    const qWords = tokenize(query);
+    if(!qWords.length){
+      searchResults.innerHTML = '';
+      return;
+    }
+    const scored = quotes
+      .map(q => ({ q, s: scoreQuote(qWords, q) }))
+      .filter(x => x.s)
+      .sort((a, b) => (b.s.ordered - a.s.ordered) || (b.s.free - a.s.free));
+
+    const top = scored.slice(0, 8);
+    if(!top.length){
+      searchResults.innerHTML = `<div class="search-empty">No matches.</div>`;
+      return;
+    }
+    searchResults.innerHTML = top.map((x, i) => {
+      const text = lang==='es' && x.q.quote_es ? x.q.quote_es : x.q.quote;
+      const snippet = text.length > 90 ? text.slice(0, 90) + '…' : text;
+      const book = lang==='es' && x.q.book_es ? x.q.book_es : x.q.book;
+      return `<button class="search-result" data-idx="${i}">
+        <span class="snippet">${esc(snippet)}</span>
+        <span class="src">${esc(x.q.author)} · ${esc(book)}</span>
+      </button>`;
+    }).join('');
+
+    Array.from(searchResults.querySelectorAll('.search-result')).forEach((btn, i) => {
+      btn.addEventListener('click', () => {
+        current = top[i].q;
+        recentHistory.push(current);
+        renderCard(true);
+        dropdown.classList.remove('open');
+        searchInput.value = '';
+        searchResults.innerHTML = '';
+      });
+    });
+  }
+
+  searchInput.addEventListener('input', () => runSearch(searchInput.value));
 
   function matchScore(q){
     if(!selectedTags.length) return 0;
@@ -850,8 +986,12 @@
   // presses into native browser focus traversal, so we do it ourselves here.
   function getFocusables(){
     if(dropdown.classList.contains('open')){
-      return [toggleMeta, toggleLang, toggleDark, ...Array.from(tagList.querySelectorAll('.tag-chip')), newBatchBtn, resetBtn]
-        .filter(el => el && !el.disabled);
+      return [
+        toggleMeta, toggleLang, toggleDark, searchInput,
+        ...Array.from(searchResults.querySelectorAll('.search-result')),
+        ...Array.from(tagList.querySelectorAll('.tag-chip')),
+        newBatchBtn, resetBtn
+      ].filter(el => el && !el.disabled);
     }
     return [
       document.getElementById('similarBtn'),
@@ -925,6 +1065,8 @@
   resetBtn.addEventListener('click', ()=>{
     selectedTags = [];
     filterMode = 'none';
+    searchInput.value = '';
+    searchResults.innerHTML = '';
     saveState();
     renderTagList();
     updateFilterNote();
