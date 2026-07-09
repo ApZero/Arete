@@ -1002,6 +1002,20 @@
   }
 
   document.addEventListener('keydown', (e)=>{
+    const tag = (document.activeElement && document.activeElement.tagName || '').toLowerCase();
+    const inTextField = tag === 'input' || tag === 'textarea';
+
+    if(inTextField){
+      // Let normal text editing (typing, backspace, cursor arrows) work untouched.
+      // Only Escape closes the dropdown from within the search field.
+      if(e.key === 'Escape' && dropdown.classList.contains('open')){
+        dropdown.classList.remove('open');
+        menuBtn.focus();
+        e.preventDefault();
+      }
+      return;
+    }
+
     const nav = ['ArrowUp','ArrowDown','ArrowLeft','ArrowRight'];
     if(e.key === 'Escape' || e.key === 'Backspace'){
       if(dropdown.classList.contains('open')){

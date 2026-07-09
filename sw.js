@@ -1,5 +1,5 @@
 // Bump this version string on every deploy to force clients to refresh cached assets.
-const CACHE_VERSION = 'arete-v8';
+const CACHE_VERSION = 'arete-v9';
 
 const ASSETS = [
   './',
